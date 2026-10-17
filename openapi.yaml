@@ -1,0 +1,1743 @@
+openapi: 3.0.3
+info:
+  title: '[Channel] Webshop Experience API'
+  version: 1.0.0
+  description: 'The webshop channel, for the customer portal: browse products, place an order for a customer, follow
+    it end to end (SAP invoices, the 3PL shipment, every fact on its timeline), cancel it, change where it goes,
+    and pay its invoice. Shapes what the Process and System APIs say for the webshop; the order domain decides (ADR
+    0017).'
+  contact:
+    name: Channel Team
+    url: https://github.com/azure-intelligence-domain/experience-api-webshop
+  license:
+    name: MIT
+    url: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/LICENSE
+  x-gateway: other
+x-gateway: other
+externalDocs:
+  description: EventCatalog entry of the channel domain
+  url: https://azure-intelligence-domain.github.io/eventcatalog/docs/domains/channel/1.0.0
+servers:
+- url: https://apim-intplat-demo.azure-api.net/webshop
+  description: Main gateway, for staff signed in with Google through the customer portal. No version in the URI.
+security:
+- staffToken: []
+- platformToken: []
+tags:
+- name: Webshop
+  description: Shopping and following orders.
+paths:
+  /products:
+    x-summary: Retrieve List of Products
+    get:
+      tags:
+      - Webshop
+      operationId: retrieveListOfProducts
+      summary: Retrieve List of Products
+      description: 'The catalogue: what can be ordered, at which price.'
+      parameters:
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: The products.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/productList'
+              example:
+                _links:
+                  self:
+                    href: /products
+                totalCount: 1
+                _embedded:
+                  products:
+                  - _links:
+                      self:
+                        href: /products/SKU-1042
+                    productId: SKU-1042
+                    name: Hydraulic Press HP-1042
+                    description: 40-tonne hydraulic workshop press.
+                    family: Machinery
+                    unitPrice:
+                      value: 7000.0
+                      currency: EUR
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /products
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /products
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /products
+      x-business-keys: {}
+  /customers:
+    x-summary: Retrieve List of Customers
+    get:
+      tags:
+      - Webshop
+      operationId: retrieveListOfCustomers
+      summary: Retrieve List of Customers
+      description: The customers staff may shop for.
+      parameters:
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: The customers.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/customerList'
+              example:
+                _links:
+                  self:
+                    href: /customers
+                totalCount: 1
+                _embedded:
+                  customers:
+                  - _links:
+                      self:
+                        href: /customers/ACME
+                      orders:
+                        href: /orders?customerId=ACME
+                    customerId: ACME
+                    name: ACME Corporation
+                    industry: Manufacturing
+                    shippingAddress:
+                      street: Rue de la Loi 16
+                      postalCode: '1000'
+                      city: Brussels
+                      countryCode: BE
+                    currency: EUR
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /customers
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /customers
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /customers
+      x-business-keys: {}
+  /orders:
+    x-summary: Orders
+    get:
+      tags:
+      - Webshop
+      operationId: retrieveListOfOrders
+      summary: Retrieve List of Orders
+      description: Orders, newest first, optionally of one customer or with one status.
+      parameters:
+      - $ref: '#/components/parameters/customerIdQuery'
+      - $ref: '#/components/parameters/status'
+      - $ref: '#/components/parameters/offset'
+      - $ref: '#/components/parameters/limit'
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: A page of orders.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/orderList'
+              example:
+                _links:
+                  self:
+                    href: /orders?customerId=ACME&offset=0&limit=20
+                  first:
+                    href: /orders?customerId=ACME&offset=0&limit=20
+                  last:
+                    href: /orders?customerId=ACME&offset=0&limit=20
+                totalCount: 1
+                _embedded:
+                  orders:
+                  - _links:
+                      self:
+                        href: /orders/4711
+                    orderId: '4711'
+                    customerId: ACME
+                    channel: webshop
+                    status: shipped
+                    paymentStatus: invoiced
+                    totalAmount:
+                      value: 84000.0
+                      currency: EUR
+                    createdAt: '2026-10-03T09:12:00Z'
+                    updatedAt: '2026-10-04T07:30:02Z'
+                    lineCount: 1
+                    trackingNumber: SPD4711BE
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders?customerId=ACME
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders?customerId=ACME
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders?customerId=ACME
+      x-business-keys:
+        customerid: query.customerId
+    post:
+      tags:
+      - Webshop
+      operationId: placeOrder
+      summary: Place Order
+      description: 'Places an order for a customer: the lines are priced from the catalogue, delivered to the customer''s
+        shipping address unless another is given. The order domain publishes OrderPlaced; SAP, the warehouse and
+        the 3PL follow by events.'
+      parameters:
+      - $ref: '#/components/parameters/correlationId'
+      - $ref: '#/components/parameters/idempotencyKey'
+      responses:
+        '201':
+          description: The order, placed.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/orderView'
+              example:
+                _links:
+                  self:
+                    href: /orders/4711
+                  cancel:
+                    href: /orders/4711
+                  changeDeliveryAddress:
+                    href: /orders/4711/delivery-address
+                orderId: '4711'
+                customerId: ACME
+                channel: webshop
+                status: placed
+                paymentStatus: unpaid
+                totalAmount:
+                  value: 84000.0
+                  currency: EUR
+                deliveryAddress:
+                  street: Rue de la Loi 16
+                  postalCode: '1000'
+                  city: Brussels
+                  countryCode: BE
+                requestedDeliveryDate: '2026-10-09'
+                createdAt: '2026-10-03T09:12:00Z'
+                updatedAt: '2026-10-04T07:30:02Z'
+                orderLines:
+                - lineNumber: 1
+                  productId: SKU-1042
+                  productName: Hydraulic Press HP-1042
+                  quantity: 12
+                  unitPrice:
+                    value: 7000.0
+                    currency: EUR
+                  lineAmount:
+                    value: 84000.0
+                    currency: EUR
+                progress:
+                - milestone: placed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:00Z'
+                - milestone: confirmed
+                  reached: false
+                  reachedAt: '2026-10-03T09:12:06Z'
+                - milestone: readyForShipment
+                  reached: false
+                  reachedAt: '2026-10-03T09:15:11Z'
+                - milestone: shipped
+                  reached: false
+                  reachedAt: '2026-10-04T07:30:02Z'
+                - milestone: delivered
+                  reached: false
+                - milestone: completed
+                  reached: false
+                timeline:
+                - fact: OrderPlaced
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:00Z'
+                  description: Order placed
+                invoices: []
+          headers:
+            Location:
+              description: URI of the new resource.
+              schema:
+                type: string
+              example: /orders/4711
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/placeOrderRequest'
+            example:
+              customerId: ACME
+              orderLines:
+              - productId: SKU-1042
+                quantity: 12
+              requestedDeliveryDate: '2026-10-09'
+      x-business-keys:
+        customerid: body.customerId
+  /orders/{orderId}:
+    x-summary: Order
+    get:
+      tags:
+      - Webshop
+      operationId: retrieveOrder
+      summary: Retrieve Order
+      description: 'One order with everything about it: lines, progress, timeline (every domain''s facts), invoices,
+        shipment, and links for what can be done now.'
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/orderView'
+              example:
+                _links:
+                  self:
+                    href: /orders/4711
+                  pay:
+                    href: /orders/4711/payments
+                orderId: '4711'
+                customerId: ACME
+                channel: webshop
+                status: shipped
+                paymentStatus: invoiced
+                totalAmount:
+                  value: 84000.0
+                  currency: EUR
+                deliveryAddress:
+                  street: Rue de la Loi 16
+                  postalCode: '1000'
+                  city: Brussels
+                  countryCode: BE
+                requestedDeliveryDate: '2026-10-09'
+                createdAt: '2026-10-03T09:12:00Z'
+                updatedAt: '2026-10-04T07:30:02Z'
+                orderLines:
+                - lineNumber: 1
+                  productId: SKU-1042
+                  productName: Hydraulic Press HP-1042
+                  quantity: 12
+                  unitPrice:
+                    value: 7000.0
+                    currency: EUR
+                  lineAmount:
+                    value: 84000.0
+                    currency: EUR
+                progress:
+                - milestone: placed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:00Z'
+                - milestone: confirmed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:06Z'
+                - milestone: readyForShipment
+                  reached: true
+                  reachedAt: '2026-10-03T09:15:11Z'
+                - milestone: shipped
+                  reached: true
+                  reachedAt: '2026-10-04T07:30:02Z'
+                - milestone: delivered
+                  reached: false
+                - milestone: completed
+                  reached: false
+                timeline:
+                - fact: OrderPlaced
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:00Z'
+                  description: Order placed
+                - fact: SalesOrderAccepted
+                  domain: finance
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: SAP accepted the order (credit check passed)
+                - fact: OrderConfirmed
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: Order confirmed
+                - fact: ShipmentDispatched
+                  domain: logistics
+                  occurredAt: '2026-10-04T07:30:01Z'
+                  description: The 3PL partner picked it up
+                - fact: OrderShipped
+                  domain: order
+                  occurredAt: '2026-10-04T07:30:02Z'
+                  description: Shipped
+                invoices:
+                - invoiceNumber: '90004711'
+                  amount:
+                    value: 84000.0
+                    currency: EUR
+                  paidAmount:
+                    value: 0.0
+                    currency: EUR
+                  status: open
+                  issuedAt: '2026-10-03T09:12:05Z'
+                  dueDate: '2026-11-02'
+                shipment:
+                  shipmentId: SPD-004711
+                  partnerId: speedy-3pl
+                  trackingNumber: SPD4711BE
+                  status: dispatched
+                  bookedAt: '2026-10-03T09:16:00Z'
+                  dispatchedAt: '2026-10-04T07:30:00Z'
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders/4711
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders/4711
+        '404':
+          description: No order with this id exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/not-found.md
+                title: Order Not Found
+                status: 404
+                detail: No order with this id exists.
+                instance: /orders/4711
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders/4711
+      x-business-keys:
+        orderid: path.orderId
+    delete:
+      tags:
+      - Webshop
+      operationId: cancelOrder
+      summary: Cancel Order
+      description: Cancels the order (a soft delete), until the 3PL picks it up. SAP, the warehouse and the 3PL
+        undo their part by events.
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/reason'
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: The order, cancelled.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/orderView'
+              example:
+                _links:
+                  self:
+                    href: /orders/4711
+                orderId: '4711'
+                customerId: ACME
+                channel: webshop
+                status: cancelled
+                paymentStatus: invoiced
+                totalAmount:
+                  value: 84000.0
+                  currency: EUR
+                deliveryAddress:
+                  street: Rue de la Loi 16
+                  postalCode: '1000'
+                  city: Brussels
+                  countryCode: BE
+                requestedDeliveryDate: '2026-10-09'
+                createdAt: '2026-10-03T09:12:00Z'
+                updatedAt: '2026-10-04T07:30:02Z'
+                orderLines:
+                - lineNumber: 1
+                  productId: SKU-1042
+                  productName: Hydraulic Press HP-1042
+                  quantity: 12
+                  unitPrice:
+                    value: 7000.0
+                    currency: EUR
+                  lineAmount:
+                    value: 84000.0
+                    currency: EUR
+                progress:
+                - milestone: placed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:00Z'
+                - milestone: confirmed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:06Z'
+                - milestone: readyForShipment
+                  reached: true
+                  reachedAt: '2026-10-03T09:15:11Z'
+                - milestone: shipped
+                  reached: true
+                  reachedAt: '2026-10-04T07:30:02Z'
+                - milestone: delivered
+                  reached: false
+                - milestone: completed
+                  reached: false
+                timeline:
+                - fact: OrderPlaced
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:00Z'
+                  description: Order placed
+                - fact: SalesOrderAccepted
+                  domain: finance
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: SAP accepted the order (credit check passed)
+                - fact: OrderConfirmed
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: Order confirmed
+                - fact: ShipmentDispatched
+                  domain: logistics
+                  occurredAt: '2026-10-04T07:30:01Z'
+                  description: The 3PL partner picked it up
+                - fact: OrderShipped
+                  domain: order
+                  occurredAt: '2026-10-04T07:30:02Z'
+                  description: Shipped
+                invoices:
+                - invoiceNumber: '90004711'
+                  amount:
+                    value: 84000.0
+                    currency: EUR
+                  paidAmount:
+                    value: 0.0
+                    currency: EUR
+                  status: open
+                  issuedAt: '2026-10-03T09:12:05Z'
+                  dueDate: '2026-11-02'
+                shipment:
+                  shipmentId: SPD-004711
+                  partnerId: speedy-3pl
+                  trackingNumber: SPD4711BE
+                  status: dispatched
+                  bookedAt: '2026-10-03T09:16:00Z'
+                  dispatchedAt: '2026-10-04T07:30:00Z'
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders/4711
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders/4711
+        '404':
+          description: No order with this id exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/not-found.md
+                title: Order Not Found
+                status: 404
+                detail: No order with this id exists.
+                instance: /orders/4711
+        '409':
+          description: The order's status does not allow this now; the order domain decides.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/conflict.md
+                title: Order State Conflict
+                status: 409
+                detail: The order's status does not allow this now; the order domain decides.
+                instance: /orders/4711
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders/4711
+      x-business-keys:
+        orderid: path.orderId
+  /orders/{orderId}/delivery-address:
+    x-summary: Order Delivery Address
+    put:
+      tags:
+      - Webshop
+      operationId: changeDeliveryAddress
+      summary: Change Delivery Address
+      description: Where the order goes, while it is not ready for shipment.
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/orderView'
+              example:
+                _links:
+                  self:
+                    href: /orders/4711
+                  pay:
+                    href: /orders/4711/payments
+                orderId: '4711'
+                customerId: ACME
+                channel: webshop
+                status: shipped
+                paymentStatus: invoiced
+                totalAmount:
+                  value: 84000.0
+                  currency: EUR
+                deliveryAddress:
+                  street: Rue de la Loi 16
+                  postalCode: '1000'
+                  city: Brussels
+                  countryCode: BE
+                requestedDeliveryDate: '2026-10-09'
+                createdAt: '2026-10-03T09:12:00Z'
+                updatedAt: '2026-10-04T07:30:02Z'
+                orderLines:
+                - lineNumber: 1
+                  productId: SKU-1042
+                  productName: Hydraulic Press HP-1042
+                  quantity: 12
+                  unitPrice:
+                    value: 7000.0
+                    currency: EUR
+                  lineAmount:
+                    value: 84000.0
+                    currency: EUR
+                progress:
+                - milestone: placed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:00Z'
+                - milestone: confirmed
+                  reached: true
+                  reachedAt: '2026-10-03T09:12:06Z'
+                - milestone: readyForShipment
+                  reached: true
+                  reachedAt: '2026-10-03T09:15:11Z'
+                - milestone: shipped
+                  reached: true
+                  reachedAt: '2026-10-04T07:30:02Z'
+                - milestone: delivered
+                  reached: false
+                - milestone: completed
+                  reached: false
+                timeline:
+                - fact: OrderPlaced
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:00Z'
+                  description: Order placed
+                - fact: SalesOrderAccepted
+                  domain: finance
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: SAP accepted the order (credit check passed)
+                - fact: OrderConfirmed
+                  domain: order
+                  occurredAt: '2026-10-03T09:12:06Z'
+                  description: Order confirmed
+                - fact: ShipmentDispatched
+                  domain: logistics
+                  occurredAt: '2026-10-04T07:30:01Z'
+                  description: The 3PL partner picked it up
+                - fact: OrderShipped
+                  domain: order
+                  occurredAt: '2026-10-04T07:30:02Z'
+                  description: Shipped
+                invoices:
+                - invoiceNumber: '90004711'
+                  amount:
+                    value: 84000.0
+                    currency: EUR
+                  paidAmount:
+                    value: 0.0
+                    currency: EUR
+                  status: open
+                  issuedAt: '2026-10-03T09:12:05Z'
+                  dueDate: '2026-11-02'
+                shipment:
+                  shipmentId: SPD-004711
+                  partnerId: speedy-3pl
+                  trackingNumber: SPD4711BE
+                  status: dispatched
+                  bookedAt: '2026-10-03T09:16:00Z'
+                  dispatchedAt: '2026-10-04T07:30:00Z'
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders/4711/delivery-address
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders/4711/delivery-address
+        '404':
+          description: No order with this id exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/not-found.md
+                title: Order Not Found
+                status: 404
+                detail: No order with this id exists.
+                instance: /orders/4711/delivery-address
+        '409':
+          description: The order's status does not allow this now; the order domain decides.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/conflict.md
+                title: Order State Conflict
+                status: 409
+                detail: The order's status does not allow this now; the order domain decides.
+                instance: /orders/4711/delivery-address
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders/4711/delivery-address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/deliveryAddress'
+            example:
+              street: Avenue Louise 54
+              postalCode: '1050'
+              city: Brussels
+              countryCode: BE
+      x-business-keys:
+        orderid: path.orderId
+  /orders/{orderId}/payments:
+    x-summary: Order Payments
+    post:
+      tags:
+      - Webshop
+      operationId: payInvoice
+      summary: Pay Invoice
+      description: 'Pays an open invoice of the order in full (the payment provider is simulated): SAP records the
+        payment and the order becomes paid.'
+      parameters:
+      - $ref: '#/components/parameters/orderId'
+      - $ref: '#/components/parameters/correlationId'
+      responses:
+        '201':
+          description: The payment.
+          content:
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/payment'
+              example:
+                _links:
+                  self:
+                    href: /orders/4711/payments/1400000001
+                  order:
+                    href: /orders/4711
+                paymentId: '1400000001'
+                invoiceNumber: '90004711'
+                amount:
+                  value: 84000.0
+                  currency: EUR
+                invoicePaidInFull: true
+                receivedAt: '2026-10-10T08:00:00Z'
+          headers:
+            Location:
+              description: URI of the new resource.
+              schema:
+                type: string
+              example: /orders/4711/payments/1400000001
+        '400':
+          description: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/invalid-request.md
+                title: Invalid Request
+                status: 400
+                detail: The request does not match the contract, or the Correlation-Id header is missing or invalid.
+                instance: /orders/4711/payments
+        '401':
+          description: No valid staff sign-in (the gateway answers).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/integration-platform/blob/main/docs/problems/staff-sign-in-required.md
+                title: Staff Sign-In Required
+                status: 401
+                detail: No valid staff sign-in (the gateway answers).
+                instance: /orders/4711/payments
+        '404':
+          description: No such order, or the order has no such invoice.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/not-found.md
+                title: Not Found
+                status: 404
+                detail: No such order, or the order has no such invoice.
+                instance: /orders/4711/payments
+        '409':
+          description: The invoice is paid already, or credited.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/conflict.md
+                title: Invoice Not Payable
+                status: 409
+                detail: The invoice is paid already, or credited.
+                instance: /orders/4711/payments
+        '502':
+          description: A Process or System API behind the gateway failed; try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/problemDetail'
+              example:
+                type: https://github.com/azure-intelligence-domain/experience-api-webshop/blob/main/docs/problems/downstream-failure.md
+                title: Downstream Failure
+                status: 502
+                detail: A Process or System API behind the gateway failed; try again later.
+                instance: /orders/4711/payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/paymentRequest'
+            example:
+              invoiceNumber: '90004711'
+      x-business-keys:
+        orderid: path.orderId
+components:
+  securitySchemes:
+    staffToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Google ID token for the customer portal's OAuth client, of a Google Workspace account of the
+        staff domain (routing/staff.yaml in integration-platform; ADR 0017).
+    platformToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An Entra ID token for the intplat-platform-apis application, of a building block on the platform's
+        allow-list (the journey test).
+  parameters:
+    correlationId:
+      name: Correlation-Id
+      in: header
+      required: true
+      description: The business journey this call belongs to, for example ord-4711 or web-7f3a.
+      schema:
+        type: string
+        pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+        maxLength: 64
+      example: ord-4711
+    orderId:
+      name: orderId
+      in: path
+      required: true
+      description: The order id, for example 4711.
+      schema:
+        type: string
+        pattern: ^[0-9]+$
+      example: '4711'
+    customerIdQuery:
+      name: customerId
+      in: query
+      required: false
+      description: Only orders of this customer.
+      schema:
+        type: string
+      example: ACME
+    status:
+      name: status
+      in: query
+      required: false
+      description: Only orders with this status.
+      schema:
+        type: string
+      example: shipped
+    offset:
+      name: offset
+      in: query
+      required: false
+      description: Orders to skip.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+    limit:
+      name: limit
+      in: query
+      required: false
+      description: Orders per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+    reason:
+      name: reason
+      in: query
+      required: false
+      description: Why, at most 200 characters.
+      schema:
+        type: string
+        maxLength: 200
+      example: Ordered twice by mistake.
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: A retry with the same key places nothing new.
+      schema:
+        type: string
+        maxLength: 64
+      example: 0b7e2a4c-4711-4c1e-9d2a-acme0001
+  schemas:
+    money:
+      type: object
+      description: An amount of money.
+      required:
+      - value
+      - currency
+      properties:
+        value:
+          type: number
+          description: The amount.
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          pattern: ^[A-Z]{3}$
+    deliveryAddress:
+      type: object
+      description: Delivery address.
+      required:
+      - street
+      - postalCode
+      - city
+      - countryCode
+      properties:
+        street:
+          type: string
+          description: Street and number.
+          minLength: 1
+        postalCode:
+          type: string
+          description: Postal code.
+          minLength: 1
+        city:
+          type: string
+          description: City.
+          minLength: 1
+        countryCode:
+          type: string
+          description: ISO 3166-1 alpha-2.
+          pattern: ^[A-Z]{2}$
+    halLink:
+      type: object
+      description: A HAL link.
+      required:
+      - href
+      properties:
+        href:
+          type: string
+          description: URI relative to the API root.
+    problemDetail:
+      type: object
+      description: Problem Details (RFC 9457).
+      required:
+      - title
+      - detail
+      properties:
+        type:
+          type: string
+          description: Problem type.
+          format: uri
+        title:
+          type: string
+          description: Summary.
+        status:
+          type: integer
+          description: HTTP status.
+        detail:
+          type: string
+          description: This occurrence.
+        instance:
+          type: string
+          description: Request URI.
+    customer:
+      type: object
+      description: A customer.
+      required:
+      - _links
+      - customerId
+      - name
+      - shippingAddress
+      - currency
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+            orders:
+              $ref: '#/components/schemas/halLink'
+        customerId:
+          type: string
+          description: The customer, e.g. ACME.
+        name:
+          type: string
+          description: Name.
+        industry:
+          type: string
+          description: Industry.
+        shippingAddress:
+          $ref: '#/components/schemas/deliveryAddress'
+        currency:
+          type: string
+          description: The customer's currency.
+          pattern: ^[A-Z]{3}$
+    customerList:
+      type: object
+      description: All customers.
+      required:
+      - _links
+      - totalCount
+      - _embedded
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+        totalCount:
+          type: integer
+          description: Number of customers.
+          minimum: 0
+        _embedded:
+          type: object
+          description: The customers.
+          required:
+          - customers
+          properties:
+            customers:
+              type: array
+              description: Customers.
+              items:
+                $ref: '#/components/schemas/customer'
+    invoice:
+      type: object
+      description: An invoice of the order.
+      required:
+      - invoiceNumber
+      - amount
+      - paidAmount
+      - status
+      - issuedAt
+      - dueDate
+      properties:
+        invoiceNumber:
+          type: string
+          description: Invoice number.
+        amount:
+          $ref: '#/components/schemas/money'
+        paidAmount:
+          $ref: '#/components/schemas/money'
+        status:
+          type: string
+          description: Open until paid in full. More values may follow.
+          x-extensible-enum:
+          - open
+          - paid
+        issuedAt:
+          type: string
+          description: Issued. ISO 8601, UTC.
+          format: date-time
+        dueDate:
+          type: string
+          description: Due date. ISO 8601.
+          format: date
+        creditNote:
+          type: object
+          description: Present when a credit note reversed the invoice (the order was cancelled).
+          required:
+          - creditNoteNumber
+          - amount
+          - issuedAt
+          properties:
+            creditNoteNumber:
+              type: string
+              description: Credit note number.
+            amount:
+              $ref: '#/components/schemas/money'
+            issuedAt:
+              type: string
+              description: Issued. ISO 8601, UTC.
+              format: date-time
+    orderSummary:
+      type: object
+      description: An order in a list.
+      required:
+      - _links
+      - orderId
+      - customerId
+      - status
+      - paymentStatus
+      - totalAmount
+      - createdAt
+      - lineCount
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+        orderId:
+          type: string
+          description: The order id.
+        customerId:
+          type: string
+          description: The customer.
+        channel:
+          type: string
+          description: Where it was placed.
+        status:
+          type: string
+          description: The order domain's status. More values may follow.
+          x-extensible-enum:
+          - placed
+          - confirmed
+          - rejected
+          - onHold
+          - readyForShipment
+          - shipped
+          - delivered
+          - completed
+          - cancelled
+        paymentStatus:
+          type: string
+          description: Payment status. More values may follow.
+          x-extensible-enum:
+          - unpaid
+          - invoiced
+          - paid
+        totalAmount:
+          $ref: '#/components/schemas/money'
+        createdAt:
+          type: string
+          description: Placed. ISO 8601, UTC.
+          format: date-time
+        updatedAt:
+          type: string
+          description: Last changed. ISO 8601, UTC.
+          format: date-time
+        lineCount:
+          type: integer
+          description: Number of lines.
+          minimum: 1
+        trackingNumber:
+          type: string
+          description: The 3PL's tracking number, once booked.
+    orderList:
+      type: object
+      description: A page of orders (adidas pagination).
+      required:
+      - _links
+      - totalCount
+      - _embedded
+      properties:
+        _links:
+          type: object
+          description: self, first, last, prev, next.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+            first:
+              $ref: '#/components/schemas/halLink'
+            last:
+              $ref: '#/components/schemas/halLink'
+            prev:
+              $ref: '#/components/schemas/halLink'
+            next:
+              $ref: '#/components/schemas/halLink'
+        totalCount:
+          type: integer
+          description: Matching orders.
+          minimum: 0
+        _embedded:
+          type: object
+          description: The orders on this page.
+          required:
+          - orders
+          properties:
+            orders:
+              type: array
+              description: Orders.
+              items:
+                $ref: '#/components/schemas/orderSummary'
+    orderView:
+      type: object
+      description: One order with everything about it.
+      required:
+      - _links
+      - orderId
+      - customerId
+      - status
+      - paymentStatus
+      - totalAmount
+      - deliveryAddress
+      - orderLines
+      - progress
+      - timeline
+      - invoices
+      - createdAt
+      properties:
+        _links:
+          type: object
+          description: 'HAL links: self, and one link per action the order domain allows now.'
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+            cancel:
+              $ref: '#/components/schemas/halLink'
+            changeDeliveryAddress:
+              $ref: '#/components/schemas/halLink'
+            pay:
+              $ref: '#/components/schemas/halLink'
+        orderId:
+          type: string
+          description: The order id.
+        customerId:
+          type: string
+          description: The customer.
+        channel:
+          type: string
+          description: Where the order was placed.
+        status:
+          type: string
+          description: The order domain's status. More values may follow.
+          x-extensible-enum:
+          - placed
+          - confirmed
+          - rejected
+          - onHold
+          - readyForShipment
+          - shipped
+          - delivered
+          - completed
+          - cancelled
+        paymentStatus:
+          type: string
+          description: Payment status. More values may follow.
+          x-extensible-enum:
+          - unpaid
+          - invoiced
+          - paid
+        totalAmount:
+          $ref: '#/components/schemas/money'
+        deliveryAddress:
+          $ref: '#/components/schemas/deliveryAddress'
+        requestedDeliveryDate:
+          type: string
+          description: Requested delivery date. ISO 8601.
+          format: date
+        holdReason:
+          type: string
+          description: Why the order is on hold, when it is.
+        cancellationReason:
+          type: string
+          description: Why the order was cancelled, when it was.
+        createdAt:
+          type: string
+          description: Placed. ISO 8601, UTC.
+          format: date-time
+        updatedAt:
+          type: string
+          description: Last changed. ISO 8601, UTC.
+          format: date-time
+        orderLines:
+          type: array
+          description: The lines, with their product names and amounts.
+          items:
+            type: object
+            description: A line.
+            required:
+            - lineNumber
+            - productId
+            - quantity
+            - unitPrice
+            - lineAmount
+            properties:
+              lineNumber:
+                type: integer
+                description: Line number.
+                minimum: 1
+              productId:
+                type: string
+                description: The product.
+              productName:
+                type: string
+                description: The product's name.
+              quantity:
+                type: integer
+                description: Units.
+                minimum: 1
+              unitPrice:
+                $ref: '#/components/schemas/money'
+              lineAmount:
+                $ref: '#/components/schemas/money'
+        progress:
+          type: array
+          description: 'The order''s way, milestone by milestone: placed, confirmed, readyForShipment, shipped,
+            delivered, completed.'
+          items:
+            type: object
+            description: A milestone.
+            required:
+            - milestone
+            - reached
+            properties:
+              milestone:
+                type: string
+                description: The milestone.
+              reached:
+                type: boolean
+                description: Reached yet.
+              reachedAt:
+                type: string
+                description: When. ISO 8601, UTC.
+                format: date-time
+        timeline:
+          type: array
+          description: Every business fact about the order, from every domain, oldest first, in plain words.
+          items:
+            type: object
+            description: A fact.
+            required:
+            - fact
+            - domain
+            - occurredAt
+            - description
+            properties:
+              fact:
+                type: string
+                description: The business fact, e.g. SalesOrderAccepted.
+              domain:
+                type: string
+                description: Who published it, e.g. finance.
+              occurredAt:
+                type: string
+                description: When. ISO 8601, UTC.
+                format: date-time
+              description:
+                type: string
+                description: What it means, in plain words.
+        invoices:
+          type: array
+          description: The order's invoices (finance).
+          items:
+            $ref: '#/components/schemas/invoice'
+        shipment:
+          type: object
+          description: The order's shipment with the 3PL partner (logistics), once booked.
+          required:
+          - shipmentId
+          - partnerId
+          - trackingNumber
+          - status
+          properties:
+            shipmentId:
+              type: string
+              description: Consignment id.
+            partnerId:
+              type: string
+              description: The 3PL partner.
+            trackingNumber:
+              type: string
+              description: Tracking number.
+            status:
+              type: string
+              description: Where the shipment is. More values may follow.
+              x-extensible-enum:
+              - booked
+              - dispatched
+              - delivered
+              - cancelled
+            bookedAt:
+              type: string
+              description: Booked. ISO 8601, UTC.
+              format: date-time
+            dispatchedAt:
+              type: string
+              description: Picked up by the partner. ISO 8601, UTC.
+              format: date-time
+            deliveredAt:
+              type: string
+              description: Delivered. ISO 8601, UTC.
+              format: date-time
+            receivedBy:
+              type: string
+              description: Who signed for it.
+            cancelledAt:
+              type: string
+              description: Cancelled. ISO 8601, UTC.
+              format: date-time
+    product:
+      type: object
+      description: A product in the catalogue, with its price.
+      required:
+      - _links
+      - productId
+      - name
+      - unitPrice
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+        productId:
+          type: string
+          description: The product, e.g. SKU-1042.
+        name:
+          type: string
+          description: Name.
+        description:
+          type: string
+          description: Description.
+        family:
+          type: string
+          description: Family.
+        unitPrice:
+          $ref: '#/components/schemas/money'
+    productList:
+      type: object
+      description: The catalogue.
+      required:
+      - _links
+      - totalCount
+      - _embedded
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+        totalCount:
+          type: integer
+          description: Number of products.
+          minimum: 0
+        _embedded:
+          type: object
+          description: The products.
+          required:
+          - products
+          properties:
+            products:
+              type: array
+              description: Products.
+              items:
+                $ref: '#/components/schemas/product'
+    placeOrderRequest:
+      type: object
+      description: 'An order from the webshop: the webshop prices the lines from the catalogue.'
+      required:
+      - customerId
+      - orderLines
+      properties:
+        customerId:
+          type: string
+          description: The customer, e.g. ACME.
+          minLength: 1
+        orderLines:
+          type: array
+          description: What to order.
+          items:
+            type: object
+            description: A line.
+            required:
+            - productId
+            - quantity
+            properties:
+              productId:
+                type: string
+                description: The product.
+              quantity:
+                type: integer
+                description: Units.
+                minimum: 1
+                maximum: 1000
+          minItems: 1
+        deliveryAddress:
+          allOf:
+          - $ref: '#/components/schemas/deliveryAddress'
+          description: Where to deliver; the customer's shipping address if omitted.
+        requestedDeliveryDate:
+          type: string
+          description: Requested delivery date. ISO 8601.
+          format: date
+      additionalProperties: false
+    paymentRequest:
+      type: object
+      description: Pay an invoice of the order in full.
+      required:
+      - invoiceNumber
+      properties:
+        invoiceNumber:
+          type: string
+          description: The invoice.
+          minLength: 1
+    payment:
+      type: object
+      description: A payment.
+      required:
+      - _links
+      - paymentId
+      - invoiceNumber
+      - amount
+      - invoicePaidInFull
+      - receivedAt
+      properties:
+        _links:
+          type: object
+          description: HAL links.
+          required:
+          - self
+          properties:
+            self:
+              $ref: '#/components/schemas/halLink'
+            order:
+              $ref: '#/components/schemas/halLink'
+        paymentId:
+          type: string
+          description: Payment document.
+        invoiceNumber:
+          type: string
+          description: The invoice.
+        amount:
+          $ref: '#/components/schemas/money'
+        invoicePaidInFull:
+          type: boolean
+          description: true once the invoice is covered.
+        receivedAt:
+          type: string
+          description: When. ISO 8601, UTC.
+          format: date-time
