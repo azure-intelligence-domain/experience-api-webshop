@@ -2,7 +2,10 @@
 // and System APIs through the gateway as its runtime identity (an allow-listed internal caller), and
 // only the people gateway can call it (Easy Auth).
 
-param location string = 'belgiumcentral'
+// France Central, the fallback region (README): on 2026-10-17 Belgium Central answered every new App
+// Service plan for this subscription with 429 "App Service Plan Create operation is throttled";
+// France Central is also where the gateways run.
+param location string = 'francecentral'
 
 @description('Application (client) id of the intplat-platform-apis Entra application (ADR 0014).')
 param platformApisAppId string = 'e3337087-144a-4b2e-8faa-c802660b9dee'
